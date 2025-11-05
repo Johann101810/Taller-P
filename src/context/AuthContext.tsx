@@ -1,23 +1,57 @@
 // ✅ usa importación de tipo para User
-import { onAuthStateChanged } from 'firebase/auth';
-import type { User } from 'firebase/auth';
+import Landing from '../pages/Landing';
 
+import { onAuthStateChanged, type User } from 'firebase/auth';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+
 import { auth } from '../lib/firebase';
 
-const AuthCtx = createContext<{ user: User | null | undefined }>({ user: undefined });
+
+type AuthValue = { user: User | null | undefined; loading: boolean };
+
+const AuthCtx = createContext<AuthValue>({ user: undefined, loading: true });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null | undefined>(undefined);
-  useEffect(() => onAuthStateChanged(auth, setUser), []);
-  return <AuthCtx.Provider value={{ user }}>{children}</AuthCtx.Provider>;
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Suscribe a cambios de sesión
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  return <AuthCtx.Provider value={{ user, loading }}>{children}</AuthCtx.Provider>;
 }
 
-export function useAuth() { return useContext(AuthCtx); }
+export function useAuth() {
+  return useContext(AuthCtx);
+}
+
+/** UI bonita cuando no hay sesión */
+
+
+/** Loader elegante mientras se resuelve la sesión */
+function AuthLoading() {
+  return (
+    <div className="d-flex align-items-center justify-content-center min-vh-100">
+      <div className="text-center">
+        <div className="spinner-border text-primary mb-3" role="status" aria-label="Cargando" />
+        <div className="text-muted">Cargando…</div>
+      </div>
+    </div>
+  );
+}
+
+
 
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  if (user === undefined) return <div className="container py-5">Cargando…</div>;
-  if (!user) return <div className="container py-5">No autenticado. <a href="/login">Inicia sesión</a></div>;
+  const { user, loading } = useAuth();
+  if (loading) return <AuthLoading />;
+  if (!user) return <Landing />;   // <<< mostrar landing
   return <>{children}</>;
 }
+
